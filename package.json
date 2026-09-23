@@ -1,0 +1,10 @@
+{
+  "name": "gymtracker",
+  "private": true,
+  "type": "module",
+  "description": "Personal gym tracker PWA. No build step: the app is the plain files. This file is only used to run the tests.",
+  "scripts": {
+    "serve": "npx http-server -p 8080 -c-1 .",
+    "test": "node --test tests/logic.test.mjs && node tests/e2e.test.mjs"
+  }
+}
