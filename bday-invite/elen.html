@@ -204,8 +204,14 @@ button,a.btn{font-family:'Josefin Sans',sans-serif;cursor:pointer}
           <div class="divider" aria-hidden="true"><span></span><i></i><span></span></div>
           <div style="display:flex;flex-direction:column;align-items:center;gap:10px;width:100%">
             <p class="script" style="margin:0;font-size:32px;line-height:1.05;color:var(--accent)">Ton rôle de la soirée</p>
-            <button id="die" aria-label="Lancer le dé"></button>
-            <p id="dieText" style="margin:6px 0 0;font-size:13px;line-height:1.5;color:#4A3B36;min-height:40px">Touche le dé pour découvrir ton rôle !</p>
+            <div id="scratch" style="position:relative;width:270px;height:132px;border-radius:18px;overflow:hidden;border:2px solid #D4AF5A;box-shadow:0 0 0 3px var(--paper),0 8px 20px rgba(212,175,90,.3)">
+              <div style="position:absolute;inset:0;background:#FDF3E1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:10px">
+                <p class="script" style="margin:0;font-size:34px;line-height:1;color:var(--accent)">Première part</p>
+                <p style="margin:0;font-size:13px;line-height:1.4;color:#4A3B36">La première part de gâteau est pour toi !</p>
+              </div>
+              <canvas id="scratchCanvas" width="540" height="264" aria-label="Zone à gratter" style="position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:pointer"></canvas>
+            </div>
+            <p id="scratchHint" style="margin:6px 0 0;font-size:13px;line-height:1.5;color:#4A3B36">Gratte avec ton doigt pour découvrir ton rôle !</p>
           </div>
           <button class="flipBtn caps" style="margin-top:auto;border:2px solid var(--ink);border-radius:999px;background:var(--paper);padding:13px 22px 10px;min-height:46px;color:var(--ink);font-size:12px;font-weight:700;letter-spacing:2px">← Retour à l'invitation</button>
         </div>
@@ -379,32 +385,59 @@ button,a.btn{font-family:'Josefin Sans',sans-serif;cursor:pointer}
   }
   tick(); setInterval(tick, 1000);
 
-  var layouts = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
-  var die = $("#die"), pips = [];
-  for (var p = 0; p < 9; p++) { var s = document.createElement("span"); die.appendChild(s); pips.push(s); }
-  function showDie(v) {
-    var on = layouts[v];
-    pips.forEach(function (s, i) { s.style.background = on.indexOf(i) >= 0 ? (v === 1 ? "var(--accent)" : "var(--ink)") : "transparent"; });
+  var cv = $("#scratchCanvas"), ctx = cv.getContext("2d"), revealed = false;
+  function paintCoat() {
+    var g = ctx.createLinearGradient(0, 0, cv.width, cv.height);
+    g.addColorStop(0, "#C9A24A"); g.addColorStop(.35, "#F1D892"); g.addColorStop(.55, "#D4AF5A"); g.addColorStop(.8, "#F6E3B0"); g.addColorStop(1, "#B8902F");
+    ctx.globalCompositeOperation = "source-over";
+    ctx.fillStyle = g; ctx.fillRect(0, 0, cv.width, cv.height);
+    for (var i = 0; i < 260; i++) {
+      ctx.fillStyle = ["rgba(255,255,255,.75)", "rgba(158,47,69,.35)", "rgba(255,246,220,.9)"][i % 3];
+      ctx.beginPath(); ctx.arc(Math.random() * cv.width, Math.random() * cv.height, Math.random() * 2.4 + .6, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.fillStyle = "#6E1F30"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.font = "700 30px 'Josefin Sans', sans-serif";
+    ctx.fillText("GRATTE ICI", cv.width / 2, cv.height / 2 - 14);
+    ctx.font = "26px 'Josefin Sans', sans-serif";
+    ctx.fillText("✦  ✦  ✦", cv.width / 2, cv.height / 2 + 30);
+    revealed = false; cv.style.transition = ""; cv.style.opacity = "1"; cv.style.pointerEvents = "auto";
+    $("#scratchHint").textContent = "Gratte avec ton doigt pour découvrir ton rôle !";
   }
-  showDie(6);
-  var roles = {
-    1: "1 : tu lances la toute première partie !",
-    2: "2 : tu choisis le premier jeu de la soirée.",
-    3: "3 : tu es DJ officiel·le de la soirée.",
-    4: "4 : la première part de gâteau est pour toi.",
-    5: "5 : c'est toi qui portes le premier toast !",
-    6: "6 : photographe officiel·le ! À toi les photos de la soirée."
-  };
-  var rolling = false;
-  die.addEventListener("click", function () {
-    if (rolling) return; rolling = true;
-    die.classList.add("dieRoll"); $("#dieText").textContent = "Ça roule…";
-    var iv = setInterval(function () { showDie(1 + Math.floor(Math.random() * 6)); }, 90);
-    setTimeout(function () {
-      clearInterval(iv); var v = 1 + Math.floor(Math.random() * 6);
-      showDie(v); die.classList.remove("dieRoll"); $("#dieText").textContent = roles[v]; rolling = false;
-    }, 1100);
-  });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(paintCoat); else paintCoat();
+  paintCoat();
+  var down = false, last = null;
+  function pos(e) {
+    var r = cv.getBoundingClientRect(), t = e.touches ? e.touches[0] : e;
+    return { x: (t.clientX - r.left) * (cv.width / r.width), y: (t.clientY - r.top) * (cv.height / r.height) };
+  }
+  function scratchAt(p) {
+    ctx.globalCompositeOperation = "destination-out";
+    ctx.lineWidth = 46; ctx.lineCap = "round"; ctx.lineJoin = "round";
+    ctx.beginPath();
+    if (last) { ctx.moveTo(last.x, last.y); ctx.lineTo(p.x, p.y); ctx.stroke(); }
+    else { ctx.arc(p.x, p.y, 23, 0, Math.PI * 2); ctx.fill(); }
+    last = p;
+  }
+  function check() {
+    if (revealed) return;
+    var d = ctx.getImageData(0, 0, cv.width, cv.height).data, clear = 0, n = 0;
+    for (var i = 3; i < d.length; i += 64) { n++; if (d[i] < 20) clear++; }
+    if (clear / n > 0.45) {
+      revealed = true;
+      cv.style.transition = "opacity .6s"; cv.style.opacity = "0"; cv.style.pointerEvents = "none";
+      $("#scratchHint").textContent = "Bravo ! On compte sur toi samedi.";
+      fire("wish", 220, 620);
+    }
+  }
+  function start(e) { if (revealed) return; down = true; last = null; scratchAt(pos(e)); e.preventDefault(); }
+  function move(e) { if (!down) return; scratchAt(pos(e)); e.preventDefault(); }
+  function end() { if (!down) return; down = false; last = null; check(); }
+  cv.addEventListener("mousedown", start); cv.addEventListener("mousemove", move); window.addEventListener("mouseup", end);
+  cv.addEventListener("touchstart", start, { passive: false }); cv.addEventListener("touchmove", move, { passive: false }); window.addEventListener("touchend", end);
+  var moves = 0;
+  cv.addEventListener("mousemove", function () { if (down && ++moves % 8 === 0) check(); });
+  cv.addEventListener("touchmove", function () { if (down && ++moves % 8 === 0) check(); }, { passive: true });
+  $("#reset").addEventListener("click", paintCoat);
 })();
 </script>
 </body>
